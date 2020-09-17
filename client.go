@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
@@ -24,7 +25,19 @@ func NewClient(credentials, token string) (*http.Client, error) {
 	}
 
 	var t *oauth2.Token
-	if _, err := os.Stat(token); err != nil {
+	if _, err := os.Stat(token); err == nil {
+		f, err := os.Open(token)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		t = new(oauth2.Token)
+		if err = json.NewDecoder(f).Decode(t); err != nil {
+			fmt.Println("a")
+			return nil, err
+		}
+	}
+	if t == nil || t.Expiry.Before(time.Now()) {
 		authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 		browser.OpenURL(authURL)
 		fmt.Printf("Access required: to enable access for your account use the sign-in page opened in your browser or the following link:\n%s\n", authURL)
@@ -45,18 +58,6 @@ func NewClient(credentials, token string) (*http.Client, error) {
 		}
 		defer f.Close()
 		if err := json.NewEncoder(f).Encode(t); err != nil {
-			return nil, err
-		}
-	}
-	if t == nil {
-		f, err := os.Open(token)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		t = new(oauth2.Token)
-		if err = json.NewDecoder(f).Decode(t); err != nil {
-			fmt.Println("a")
 			return nil, err
 		}
 	}
